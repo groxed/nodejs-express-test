@@ -1,38 +1,21 @@
-const express = require('express')
-const port = 3000
-const path = require('path')
-const books = require('./booksRouter')
-const {sendReqTime} = require('./middlewares')
+const mongoose = require('mongoose');
+const express = require('express');
+const userRouter = require('./routers/userRouter');
 
-const app = express()
-app.use('/static', express.static(path.join(__dirname, 'public')))
-app.use('/books', books)
-app.use(sendReqTime)
-app.use((err, req, res, next)=>{
-    console.log(err.stack)
-    res.status(500).send('error occurred')
-})
+const MONGODB_URL = 'mongodb+srv://admin:myPassword@cluster0.xpddkr4.mongodb.net/?retryWrites=true&w=majority';
+const PORT = 3000;
 
-app.get('/', (req, res) => {
-    res.send("hello world!")
-})
+const app = express();
+app.use(express.json());
+app.use(userRouter);
 
-app.get('/test-middleware', (req, res)=>{
-    res.send(`request time is ${req.requestTime} <br />`)
-})
+mongoose.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: true }, () => {
+	console.log('db connect');
+});
+const db = mongoose.connection;
 
-app.post('/', (req,res)=>{
-    res.send("post request")
-})
+db.on('error', console.error.bind(console, 'an error has occurred'));
 
-app.put('/user', (req,res)=>{
-    res.send("put request at /user")
-})
-
-app.delete('/user', (req,res)=>{
-    res.send("delete request at /user")
-})
-
-app.listen(port, () => { 
-    console.log(`listening on port ${port}`)
-})
+app.listen(PORT, () => {
+	console.log('server listening on port ' + PORT);
+});
