@@ -10,63 +10,62 @@ const ENDPOINT_USERS = '/users';
 Ендпойнт що редагувати одного юзера
 Ендпойтн щоб видалити Юзера */
 
-router.post(`${ENDPOINT_USERS}`, (req, res) => {
+router.post(`${ENDPOINT_USERS}`, async (req, res) => {
 	const userRequest = req.body;
 
-	UserModel.create(userRequest, (err, savedUser) => {
-		if (err) {
+	await UserModel.create(userRequest)
+		.then(savedUser => {
+			res.send(`success! added ${savedUser}`);
+		})
+		.catch(err => {
 			res.send('an error has occurred');
-			return err;
-		}
-		res.send(`success! added ${savedUser}`);
-	});
+		});
+});
+router.get(`${ENDPOINT_USERS}`, async (_req, res) => {
+	await UserModel.find({})
+		.then(users => {
+			users.length ? res.send(users) : res.send('no users found');
+		})
+		.catch(err => {
+			res.send('an error has occurred');
+		});
 });
 
-router.get(`${ENDPOINT_USERS}`, (_req, res) => {
-	UserModel.find({}, (err, users) => {
-		if (err) {
-			res.send('an error has occurred');
-			return err;
-		}
-		users.length ? res.send(users) : res.send('no users found');
-	});
-});
-
-router.get(`${ENDPOINT_USERS}/:id`, (req, res) => {
+router.get(`${ENDPOINT_USERS}/:id`, async (req, res) => {
 	const userId = req.params.id;
 
-	UserModel.findOne({ _id: userId }, (err, user) => {
-		if (err) {
+	await UserModel.findOne({ _id: userId })
+		.then(user => {
+			user ? res.send(user) : res.send('no user with such id found');
+		})
+		.catch(err => {
 			res.send('no user with such id found or another error has occurred');
-			return err;
-		}
-		user ? res.send(user) : res.send('no user with such id found');
-	});
+		});
 });
 
-router.put(`${ENDPOINT_USERS}/:id`, (req, res) => {
+router.put(`${ENDPOINT_USERS}/:id`, async (req, res) => {
 	const userId = req.params.id;
 	const updatedUser = req.body;
 
-	UserModel.findOneAndUpdate({ _id: userId }, updatedUser, (err, user) => {
-		if (err) {
+	await UserModel.findOneAndUpdate({ _id: userId }, updatedUser)
+		.then(user => {
+			user ? res.send(`success! updated ${user}`) : res.send('no user with such id found');
+		})
+		.catch(err => {
 			res.send('no user with such id found or another error has occurred');
-			return err;
-		}
-		user ? res.send(`success! updated ${user}`) : res.send('no user with such id found');
-	});
+		});
 });
 
-router.delete(`${ENDPOINT_USERS}/:id`, (req, res) => {
+router.delete(`${ENDPOINT_USERS}/:id`, async (req, res) => {
 	const userId = req.params.id;
 
-	UserModel.findOneAndDelete({ _id: userId }, (err, user) => {
-		if (err) {
+	await UserModel.findOneAndDelete({ _id: userId })
+		.then(user => {
+			user ? res.send(`success! deleted ${user}`) : res.send('no user with such id found');
+		})
+		.catch(err => {
 			res.send('no user with such id found or another error has occurred');
-			return err;
-		}
-		user ? res.send(`success! deleted ${user}`) : res.send('no user with such id found');
-	});
+		});
 });
 
 module.exports = router;
