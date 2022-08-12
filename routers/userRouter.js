@@ -1,8 +1,11 @@
+require('dotenv').config();
+
 const express = require('express');
 const router = express.Router();
 const UserModel = require('../models/user');
 const validateToken = require('../middlewares/auth');
 const path = require('path');
+const fs = require('fs');
 
 const ENDPOINT_USERS = '/users';
 const ENDPOINT_USER = '/user';
@@ -38,6 +41,7 @@ router.get(`${ENDPOINT_USERS}/:id`, async (req, res, next) => {
 
 router.get(`${ENDPOINT_USER}/avatarPage`, async (req, res) => {
 	const user = await UserModel.findOne({ _id: req.user.userId });
+	const avatarsPath = `http://localhost:${process.env.PORT}/avatars/`;
 
 	res.setHeader('content-type', 'text/html;charset=utf-8');
 	res.write('<form action="/user/avatarPage/upload" method="POST" enctype="multipart/form-data" >');
@@ -46,7 +50,8 @@ router.get(`${ENDPOINT_USER}/avatarPage`, async (req, res) => {
 	res.write('</form>');
 
 	if (user.avatarName) {
-		res.write(`<h3>Your current avatar is ${user.avatarName}</h3>`);
+		res.write(`<h3>Your current avatar: </h3>`);
+		res.write(`<img src="${avatarsPath + user.avatarName}" style="height: 100px"/>`);
 	} else {
 		res.write(`<h3>This user has no avatar yet</h3>`);
 	}
@@ -54,7 +59,7 @@ router.get(`${ENDPOINT_USER}/avatarPage`, async (req, res) => {
 	res.end();
 });
 
-router.post(`${ENDPOINT_USER}/avatarPage/upload`, async (req, res) => {
+router.post(`${ENDPOINT_USER}/avatarPage/upload`, async (req, res, next) => {
 	if (!req.files || (req.files && !req.files.avatar)) return res.status(400).send('no file selected');
 
 	const avatarToUpload = req.files.avatar;
@@ -67,8 +72,22 @@ router.post(`${ENDPOINT_USER}/avatarPage/upload`, async (req, res) => {
 	const userToUpdate = await UserModel.findOne({ _id: userId });
 
 	const today = new Date();
-	avatarToUpload.mv(`public/${today.getFullYear()}/${today.getMonth()}/${today.getDate()}/` + avatarToUpload.name);
-	await UserModel.updateOne(userToUpdate, { $set: { avatarName: avatarToUpload.name } });
+	const avatarPath =
+		`${today.getFullYear()}/${today.getMonth()}/${today.getDate()}/` +
+		userToUpdate.firstName +
+		userToUpdate.lastName +
+		'-' +
+		avatarToUpload.name;
+	const publicAvatarsPath = 'public/avatars/';
+
+	if (userToUpdate.avatarName) {
+		await fs.unlink(publicAvatarsPath + userToUpdate.avatarName, error => {
+			if (error) next(new Error('error removing photo'));
+		});
+	}
+	avatarToUpload.mv(publicAvatarsPath + avatarPath);
+	await UserModel.updateOne(userToUpdate, { $set: { avatarName: avatarPath } });
+
 	res.send('successfully uploaded avatar!');
 });
 
