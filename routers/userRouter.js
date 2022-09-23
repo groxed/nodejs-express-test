@@ -6,8 +6,9 @@ const UserModel = require('../models/user');
 const validateToken = require('../middlewares/auth');
 const path = require('path');
 const fs = require('fs');
-const { v3: uuidv3 } = require('uuid');
+const { v4: uuidv4 } = require('uuid');
 const AWS = require('aws-sdk');
+const { getDateAsString } = require('../helpers');
 
 const BUCKET_NAME = process.env.BUCKET_NAME;
 
@@ -72,10 +73,12 @@ router.get(`${ENDPOINT_USER}/avatarPage`, async (req, res) => {
 	res.write('<input type="submit">');
 	res.write('</form>');
 
-	if (user.avatarName) {
+	if (user.avatar.name) {
 		res.write(`<h3>Your current avatar: </h3>`);
 		res.write(
-			`<img src="https://nodejs-test-app-bucket.s3.eu-central-1.amazonaws.com/images/beach.jpeg" style="height:100px;"/>`
+			`<img src="https://${BUCKET_NAME}.s3.eu-central-1.amazonaws.com/${getDateAsString(
+				user.avatar.dateOfUpload
+			)}/${user.avatar.name}" style="height:100px;"/>`
 		);
 	} else {
 		res.write(`<h3>This user has no avatar yet</h3>`);
@@ -86,39 +89,35 @@ router.get(`${ENDPOINT_USER}/avatarPage`, async (req, res) => {
 
 router.post(`${ENDPOINT_USER}/avatarPage/upload`, async (req, res, next) => {
 	if (!req.files || (req.files && !req.files.avatar)) return res.status(400).send('no file selected');
-	// extension
+
 	const avatarFile = req.files.avatar;
 	const extensionName = path.extname(avatarFile.name);
-	const allowedExtensions = ['.jpeg', '.png'];
+	const allowedExtensions = ['.jpeg', '.png', '.jpg'];
 	if (!allowedExtensions.includes(extensionName)) return res.status(400).send('invalid image extension');
 
-	//user and dates
 	const userToUpdate = await UserModel.findOne({ _id: req.user.userId });
 
-	const today = new Date();
-	const todaysDateString = `/${today.getFullYear()}/${today.getMonth()}/${today.getDate()}`;
-	const newAvatarName = uuidv4();
-
 	try {
+		const newAvatarName = uuidv4();
 		const s3 = new AWS.S3({ apiVersion: '2006-03-01' });
 		const params = {
-			Bucket: BUCKET_NAME + todaysDateString,
-			Key: newAvatarName,
-			Body: avatarFile,
+			Bucket: `${BUCKET_NAME}/${getDateAsString(new Date())}`,
+			Key: newAvatarName + extensionName,
+			Body: avatarFile.data,
 		};
 
-		await s3.putObject(params).promise();
-		await UserModel.updateOne(userToUpdate, {
-			$set: { avatarName: newAvatarName, avatarDateOfUpload: todaysDateString },
-		});
-
-		if (userToUpdate.avatarName) {
+		if (userToUpdate.avatar.name) {
 			const params = {
-				Bucket: BUCKET_NAME + userToUpdate.avatarDateOfUpload,
-				Key: userToUpdate.avatarName,
+				Bucket: `${BUCKET_NAME}/${getDateAsString(userToUpdate.avatar.dateOfUpload)}`,
+				Key: userToUpdate.avatar.name,
 			};
 			await s3.deleteObject(params).promise();
 		}
+
+		await s3.putObject(params).promise();
+		await UserModel.updateOne(userToUpdate, {
+			$set: { avatar: { name: newAvatarName + extensionName, dateOfUpload: new Date() } },
+		});
 
 		res.send('successfully uploaded avatar!');
 	} catch (error) {
